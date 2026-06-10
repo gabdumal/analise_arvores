@@ -1,9 +1,9 @@
-use crate::game::{board::Board, game_state::GameState};
+use crate::game::{board::Board, game_state::GameState, player::Player};
 use rand::prelude::*;
 
-pub fn rollout(mut board: Board) -> f64 {
+pub fn rollout(mut board: Board, root_player: Player, rollout_length: &mut usize) -> f64 {
     let mut rng = rand::rng();
-    let root_player = board.current_player();
+    *rollout_length = 0;
 
     loop {
         match board.game_state() {
@@ -17,6 +17,8 @@ pub fn rollout(mut board: Board) -> f64 {
 
             GameState::InProgress => {}
         }
+
+        *rollout_length += 1;
 
         let legal = board.legal_movements();
 

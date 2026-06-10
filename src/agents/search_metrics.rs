@@ -24,6 +24,7 @@ pub struct SearchMetrics {
     pub peak_structure_memory_bytes: usize,
 
     pub simulations: usize,
+    pub average_rollout_length: f64,
 
     pub effective_branching_factor: f64,
     pub nanoseconds_per_node: f64,

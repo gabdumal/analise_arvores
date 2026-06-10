@@ -31,12 +31,16 @@ impl MonteCarloTreeSearch {
     fn search(&mut self, match_context: &MatchContext) -> Movement {
         self.reset_metrics();
 
+        let mut total_rollout_length = 0;
+
         let start = Instant::now();
 
         self.arena.clear();
 
         self.arena
             .push(MonteCarloNode::new_root(match_context.board().clone()));
+
+        let root_player = match_context.board().current_player();
 
         for _ in 0..self.simulations {
             self.metrics.simulations += 1;
@@ -96,10 +100,16 @@ impl MonteCarloTreeSearch {
             //
             // 3. Simulation
             //
-            let reward = rollout::rollout(self.arena[node_index].board.clone());
+            let mut rollout_length = 0;
+            let reward = rollout::rollout(
+                self.arena[node_index].board.clone(),
+                root_player,
+                &mut rollout_length,
+            );
 
             self.metrics.nodes_evaluated += 1;
             self.metrics.leaf_nodes += 1;
+            total_rollout_length += rollout_length;
 
             //
             // 4. Backpropagation
@@ -147,6 +157,8 @@ impl MonteCarloTreeSearch {
             self.metrics.nanoseconds_per_node =
                 self.metrics.elapsed_time_ns as f64 / self.metrics.nodes_expanded as f64;
         }
+
+        self.metrics.average_rollout_length = total_rollout_length as f64 / self.simulations as f64;
 
         //
         // Most visited child

@@ -59,9 +59,9 @@ fn run_monte_carlo(simulations: usize) {
 
 fn monte_carlo() {
     println!("Monte-Carlo.");
-    run_monte_carlo(50_000);
-    run_monte_carlo(200_000);
-    run_monte_carlo(400_000);
+    run_monte_carlo(10_000);
+    run_monte_carlo(20_000);
+    run_monte_carlo(30_000);
 }
 
 fn main() {
