@@ -2,6 +2,7 @@ use crate::{
     agents::{
         Agent, minimax_alpha_beta::MinimaxAlphaBeta,
         minimax_alpha_beta_with_transposition_table::MinimaxAlphaBetaWithTranspositionTable,
+        monte_carlo::MonteCarloTreeSearch,
     },
     game::match_context::MatchContext,
 };
@@ -9,48 +10,65 @@ use crate::{
 mod agents;
 mod game;
 
-fn alpha_beta() {
+fn run_alpha_beta(depth_limit: usize) {
     let match_context = MatchContext::new();
+    let mut agent = MinimaxAlphaBeta::new(depth_limit);
+    let movement = agent.choose_movement(&match_context);
+    println!(
+        "Depth limit: {}. Chosen column: {}.",
+        depth_limit, movement.column
+    );
+    println!("{:#?}", agent.metrics());
+}
 
-    {
-        let mut agent = MinimaxAlphaBeta::new(6);
-        let movement = agent.choose_movement(&match_context);
-        println!("Depth limit: 6. Chosen column: {}.", movement.column);
-        println!("{:#?}", agent.metrics());
-    }
+fn alpha_beta() {
+    println!("Minimax with Alpha-Beta pruning.");
+    run_alpha_beta(6);
+    run_alpha_beta(7);
+    run_alpha_beta(8);
+}
 
-    {
-        let mut agent = MinimaxAlphaBeta::new(7);
-        let movement = agent.choose_movement(&match_context);
-        println!("Depth limit: 7. Chosen column: {}.", movement.column);
-        println!("{:#?}", agent.metrics());
-    }
-
-    {
-        let mut agent = MinimaxAlphaBeta::new(8);
-        let movement = agent.choose_movement(&match_context);
-        println!("Depth limit: 8. Chosen column: {}.", movement.column);
-        println!("{:#?}", agent.metrics());
-    }
+fn run_alpha_beta_with_transposition_table(depth_limit: usize) {
+    let match_context = MatchContext::new();
+    let mut tt = MinimaxAlphaBetaWithTranspositionTable::new(depth_limit);
+    let movement = tt.choose_movement(&match_context);
+    println!(
+        "Depth limit: {}. Chosen column: {}.",
+        depth_limit, movement.column
+    );
+    println!("{:#?}", tt.metrics());
 }
 
 fn alpha_beta_with_transposition_table() {
-    let game = MatchContext::new();
+    println!("Minimax with Alpha-Beta pruning and transposition table.");
+    run_alpha_beta_with_transposition_table(6);
+    run_alpha_beta_with_transposition_table(7);
+    run_alpha_beta_with_transposition_table(8);
+}
 
-    let mut ab = MinimaxAlphaBeta::new(8);
+fn run_monte_carlo(simulations: usize) {
+    let match_context = MatchContext::new();
+    let mut agent = MonteCarloTreeSearch::new(simulations);
+    let movement = agent.choose_movement(&match_context);
+    println!(
+        "Simulations: {}. Chosen column: {}",
+        simulations, movement.column
+    );
+    println!("{:#?}", agent.metrics());
+}
 
-    let mut tt = MinimaxAlphaBetaWithTranspositionTable::new(8);
-
-    let ab_move = ab.choose_movement(&game);
-
-    println!("AB: {:?}\n{:#?}", ab_move, ab.metrics());
-
-    let tt_move = tt.choose_movement(&game);
-
-    println!("TT: {:?}\n{:#?}", tt_move, tt.metrics());
+fn monte_carlo() {
+    println!("Monte-Carlo.");
+    run_monte_carlo(50_000);
+    run_monte_carlo(200_000);
+    run_monte_carlo(400_000);
 }
 
 fn main() {
     alpha_beta();
+    println!();
     alpha_beta_with_transposition_table();
+    println!();
+    monte_carlo();
+    println!();
 }

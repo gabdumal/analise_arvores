@@ -2,8 +2,10 @@ use crate::{
     agents::{
         Agent,
         minimax_alpha_beta::MinimaxAlphaBeta,
+        minimax_alpha_beta_with_transposition_table::transposition_table::{
+            NodeType, TranspositionTable, TranspositionTableEntry,
+        },
         search_metrics::SearchMetrics,
-        transposition_table::{NodeType, TranspositionTable, TranspositionTableEntry},
     },
     game::{
         board::Board, game_state::GameState, match_context::MatchContext, movement::Movement,
@@ -11,6 +13,8 @@ use crate::{
     },
 };
 use std::time::Instant;
+
+mod transposition_table;
 
 pub struct MinimaxAlphaBetaWithTranspositionTable {
     depth_limit: usize,

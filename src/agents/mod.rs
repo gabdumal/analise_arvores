@@ -5,8 +5,8 @@ use crate::{
 
 pub mod minimax_alpha_beta;
 pub mod minimax_alpha_beta_with_transposition_table;
+pub mod monte_carlo;
 mod search_metrics;
-mod transposition_table;
 
 pub trait Agent {
     fn name(&self) -> &'static str;
