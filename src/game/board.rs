@@ -1,5 +1,6 @@
 use crate::game::{
-    movement::Movement, player::Player, rules::winner, state::GameState, zobrist::ZobristTable,
+    evaluation, game_state::GameState, movement::Movement, player::Player, rules::winner,
+    zobrist::ZobristTable,
 };
 use std::array::repeat;
 
@@ -64,24 +65,31 @@ impl Board {
             .find(|&row| self.grid[row][column].is_none())
     }
 
-    pub fn apply_movement(&self, movement: Movement, zobrist: &ZobristTable) -> Option<Self> {
-        let row = self.next_free_row(movement.column)?;
-
-        let mut next_board = self.clone();
-
-        next_board.grid[row][movement.column] = Some(self.current_player);
-
-        let player_index = match self.current_player {
+    fn update_hash(&mut self, row: usize, column: usize, player: Player, zobrist: &ZobristTable) {
+        let player_index = match player {
             Player::Red => 0,
             Player::Yellow => 1,
         };
 
-        next_board.zobrist_hash ^= zobrist.pieces[movement.column][row][player_index];
+        self.zobrist_hash ^= zobrist.pieces[column][row][player_index];
+        self.zobrist_hash ^= zobrist.side_to_move;
+    }
 
-        next_board.zobrist_hash ^= zobrist.side_to_move;
+    pub fn apply_movement(
+        &self,
+        movement: Movement,
+        zobrist: Option<&ZobristTable>,
+    ) -> Option<Self> {
+        let row = self.next_free_row(movement.column)?;
+
+        let mut next_board = self.clone();
+        next_board.grid[row][movement.column] = Some(self.current_player);
+
+        if let Some(zobrist) = zobrist {
+            next_board.update_hash(row, movement.column, self.current_player, zobrist);
+        }
 
         next_board.current_player = self.current_player.opponent();
-
         next_board.movements_played += 1;
 
         Some(next_board)
@@ -101,11 +109,7 @@ impl Board {
     }
 
     pub fn evaluate(&self) -> isize {
-        match winner(self) {
-            Some(Player::Red) => 1_000_000,
-            Some(Player::Yellow) => -1_000_000,
-            None => 0,
-        }
+        evaluation::evaluate(self)
     }
 }
 
@@ -127,20 +131,18 @@ fn should_generate_seven_legal_movements() {
 
 #[test]
 fn should_drop_piece_at_bottom() {
-    let zobrist = ZobristTable::new();
     let board = Board::new();
 
-    let board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
+    let board = board.apply_movement(Movement::new(3), None).unwrap();
     assert_eq!(board.grid()[5][3], Some(Player::Red));
 }
 
 #[test]
 fn should_stack_pieces() {
-    let zobrist = ZobristTable::new();
     let board = Board::new();
 
-    let board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
-    let board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
+    let board = board.apply_movement(Movement::new(3), None).unwrap();
+    let board = board.apply_movement(Movement::new(3), None).unwrap();
 
     assert_eq!(board.grid()[5][3], Some(Player::Red));
     assert_eq!(board.grid()[4][3], Some(Player::Yellow));
@@ -148,102 +150,97 @@ fn should_stack_pieces() {
 
 #[test]
 fn should_not_allow_full_column() {
-    let zobrist = ZobristTable::new();
     let mut board = Board::new();
 
     for _ in 0..6 {
-        board = board.apply_movement(Movement::new(0), &zobrist).unwrap();
+        board = board.apply_movement(Movement::new(0), None).unwrap();
     }
-    assert!(board.apply_movement(Movement::new(0), &zobrist).is_none());
+    assert!(board.apply_movement(Movement::new(0), None).is_none());
 }
 
 #[test]
 fn should_detect_horizontal_win() {
-    let zobrist = ZobristTable::new();
     let mut board = Board::new();
 
-    board = board.apply_movement(Movement::new(0), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(0), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(0), None).unwrap();
+    board = board.apply_movement(Movement::new(0), None).unwrap();
 
-    board = board.apply_movement(Movement::new(1), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(1), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(1), None).unwrap();
+    board = board.apply_movement(Movement::new(1), None).unwrap();
 
-    board = board.apply_movement(Movement::new(2), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(2), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(2), None).unwrap();
+    board = board.apply_movement(Movement::new(2), None).unwrap();
 
-    board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(3), None).unwrap();
 
     assert_eq!(board.game_state(), GameState::Win(Player::Red));
 }
 
 #[test]
 fn should_detect_vertical_win() {
-    let zobrist = ZobristTable::new();
     let mut board = Board::new();
 
-    board = board.apply_movement(Movement::new(0), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(1), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(0), None).unwrap();
+    board = board.apply_movement(Movement::new(1), None).unwrap();
 
-    board = board.apply_movement(Movement::new(0), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(1), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(0), None).unwrap();
+    board = board.apply_movement(Movement::new(1), None).unwrap();
 
-    board = board.apply_movement(Movement::new(0), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(1), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(0), None).unwrap();
+    board = board.apply_movement(Movement::new(1), None).unwrap();
 
-    board = board.apply_movement(Movement::new(0), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(0), None).unwrap();
 
     assert_eq!(board.game_state(), GameState::Win(Player::Red));
 }
 
 #[test]
 fn should_detect_diagonal_up_win() {
-    let zobrist = ZobristTable::new();
     let mut board = Board::new();
 
-    board = board.apply_movement(Movement::new(0), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(6), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(0), None).unwrap();
+    board = board.apply_movement(Movement::new(6), None).unwrap();
 
-    board = board.apply_movement(Movement::new(1), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(6), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(1), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(6), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(1), None).unwrap();
+    board = board.apply_movement(Movement::new(6), None).unwrap();
+    board = board.apply_movement(Movement::new(1), None).unwrap();
+    board = board.apply_movement(Movement::new(6), None).unwrap();
 
-    board = board.apply_movement(Movement::new(2), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(5), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(2), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(5), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(2), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(5), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(2), None).unwrap();
+    board = board.apply_movement(Movement::new(5), None).unwrap();
+    board = board.apply_movement(Movement::new(2), None).unwrap();
+    board = board.apply_movement(Movement::new(5), None).unwrap();
+    board = board.apply_movement(Movement::new(2), None).unwrap();
+    board = board.apply_movement(Movement::new(5), None).unwrap();
 
-    board = board.apply_movement(Movement::new(4), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(4), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(4), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(4), None).unwrap();
+    board = board.apply_movement(Movement::new(3), None).unwrap();
+    board = board.apply_movement(Movement::new(4), None).unwrap();
+    board = board.apply_movement(Movement::new(3), None).unwrap();
+    board = board.apply_movement(Movement::new(4), None).unwrap();
+    board = board.apply_movement(Movement::new(3), None).unwrap();
+    board = board.apply_movement(Movement::new(3), None).unwrap();
 
     assert_eq!(board.game_state(), GameState::Win(Player::Red));
 }
 
 #[test]
 fn should_detect_diagonal_down_win() {
-    let zobrist = ZobristTable::new();
     let mut board = Board::new();
 
-    board = board.apply_movement(Movement::new(5), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(5), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(5), None).unwrap();
+    board = board.apply_movement(Movement::new(5), None).unwrap();
 
-    board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(4), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(4), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(3), None).unwrap();
+    board = board.apply_movement(Movement::new(4), None).unwrap();
+    board = board.apply_movement(Movement::new(4), None).unwrap();
+    board = board.apply_movement(Movement::new(3), None).unwrap();
 
-    board = board.apply_movement(Movement::new(3), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(2), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(2), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(2), &zobrist).unwrap();
-    board = board.apply_movement(Movement::new(2), &zobrist).unwrap();
+    board = board.apply_movement(Movement::new(3), None).unwrap();
+    board = board.apply_movement(Movement::new(2), None).unwrap();
+    board = board.apply_movement(Movement::new(2), None).unwrap();
+    board = board.apply_movement(Movement::new(2), None).unwrap();
+    board = board.apply_movement(Movement::new(2), None).unwrap();
 
     assert_eq!(board.game_state(), GameState::Win(Player::Red));
 }

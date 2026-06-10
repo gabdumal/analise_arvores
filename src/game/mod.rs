@@ -1,6 +1,8 @@
 pub mod board;
-mod movement;
-mod player;
+pub mod evaluation;
+pub mod game_state;
+pub mod match_context;
+pub mod movement;
+pub mod player;
 mod rules;
-mod state;
-mod zobrist;
+pub mod zobrist;

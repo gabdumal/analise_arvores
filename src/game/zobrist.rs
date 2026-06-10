@@ -37,11 +37,11 @@ fn same_position_should_have_same_hash() {
     let zobrist = ZobristTable::new();
 
     let board1 = Board::new()
-        .apply_movement(Movement::new(3), &zobrist)
+        .apply_movement(Movement::new(3), Some(&zobrist))
         .unwrap();
 
     let board2 = Board::new()
-        .apply_movement(Movement::new(3), &zobrist)
+        .apply_movement(Movement::new(3), Some(&zobrist))
         .unwrap();
 
     assert_eq!(board1.zobrist_hash(), board2.zobrist_hash());
@@ -52,11 +52,11 @@ fn different_positions_should_have_different_hashes() {
     let zobrist = ZobristTable::new();
 
     let board1 = Board::new()
-        .apply_movement(Movement::new(3), &zobrist)
+        .apply_movement(Movement::new(3), Some(&zobrist))
         .unwrap();
 
     let board2 = Board::new()
-        .apply_movement(Movement::new(4), &zobrist)
+        .apply_movement(Movement::new(4), Some(&zobrist))
         .unwrap();
 
     assert_ne!(board1.zobrist_hash(), board2.zobrist_hash());
@@ -68,7 +68,9 @@ fn side_to_move_should_change_hash() {
 
     let board1 = Board::new();
 
-    let board2 = board1.apply_movement(Movement::new(0), &zobrist).unwrap();
+    let board2 = board1
+        .apply_movement(Movement::new(0), Some(&zobrist))
+        .unwrap();
 
     assert_ne!(board1.zobrist_hash(), board2.zobrist_hash());
 }
@@ -81,7 +83,7 @@ fn should_not_collide_in_small_sample() {
 
     for column in 0..7 {
         let board = Board::new()
-            .apply_movement(Movement::new(column), &zobrist)
+            .apply_movement(Movement::new(column), Some(&zobrist))
             .unwrap();
 
         assert!(hashes.insert(board.zobrist_hash()));
