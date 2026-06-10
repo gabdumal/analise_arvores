@@ -21,12 +21,12 @@ impl MinimaxAlphaBeta {
         }
     }
 
-    fn search(&mut self, game: &MatchContext) -> Movement {
+    fn search(&mut self, match_context: &MatchContext) -> Movement {
         self.reset_metrics();
 
         let start = Instant::now();
 
-        let board = game.board();
+        let board = match_context.board();
 
         let maximizing = board.current_player() == Player::Red;
 
@@ -41,7 +41,6 @@ impl MinimaxAlphaBeta {
 
             let score = self.minimax(
                 &child,
-                game,
                 self.depth_limit - 1,
                 isize::MIN,
                 isize::MAX,
@@ -54,15 +53,26 @@ impl MinimaxAlphaBeta {
                     best_score = score;
                     best_movement = movement;
                 }
-            } else {
-                if score < best_score {
-                    best_score = score;
-                    best_movement = movement;
-                }
+            } else if score < best_score {
+                best_score = score;
+                best_movement = movement;
             }
         }
 
         self.metrics.elapsed_time_ns = start.elapsed().as_nanos();
+
+        //
+        // Derived metrics
+        //
+        if self.metrics.max_depth_reached > 0 {
+            self.metrics.effective_branching_factor = (self.metrics.nodes_expanded as f64)
+                .powf(1.0 / self.metrics.max_depth_reached as f64);
+        }
+
+        if self.metrics.nodes_expanded > 0 {
+            self.metrics.nanoseconds_per_node =
+                self.metrics.elapsed_time_ns as f64 / self.metrics.nodes_expanded as f64;
+        }
 
         best_movement
     }
@@ -70,7 +80,6 @@ impl MinimaxAlphaBeta {
     fn minimax(
         &mut self,
         board: &Board,
-        game: &MatchContext,
         depth: usize,
         mut alpha: isize,
         mut beta: isize,
@@ -81,27 +90,49 @@ impl MinimaxAlphaBeta {
 
         self.metrics.max_depth_reached = self.metrics.max_depth_reached.max(current_depth);
 
+        //
+        // Alpha-Beta puro:
+        // memória ≈ profundidade da pilha
+        //
         self.metrics.peak_nodes_in_memory = self.metrics.peak_nodes_in_memory.max(current_depth);
 
-        self.metrics.peak_frontier_size = self
-            .metrics
-            .peak_frontier_size
-            .max(board.legal_movements().len());
+        let legal_movements = board.legal_movements();
+
+        self.metrics.peak_frontier_size =
+            self.metrics.peak_frontier_size.max(legal_movements.len());
 
         self.metrics.estimated_stack_memory_bytes = self
             .metrics
             .estimated_stack_memory_bytes
             .max(current_depth * std::mem::size_of::<Board>());
 
+        //
+        // Não existe estrutura auxiliar
+        //
+        self.metrics.peak_structure_memory_bytes = 0;
+
+        //
+        // Depth cutoff
+        //
         if depth == 0 {
             self.metrics.leaf_nodes += 1;
+
+            //
+            // Heurística realmente executada
+            //
+            self.metrics.nodes_evaluated += 1;
+
             return board.evaluate();
         }
 
+        //
+        // Terminal node
+        //
         match board.game_state() {
             GameState::InProgress => {}
             _ => {
                 self.metrics.leaf_nodes += 1;
+                self.metrics.nodes_evaluated += 1;
                 return board.evaluate();
             }
         }
@@ -109,12 +140,11 @@ impl MinimaxAlphaBeta {
         if maximizing {
             let mut value = isize::MIN;
 
-            for movement in board.legal_movements() {
+            for movement in legal_movements {
                 let child = board.apply_movement(movement, None).unwrap();
 
                 value = value.max(self.minimax(
                     &child,
-                    game,
                     depth - 1,
                     alpha,
                     beta,
@@ -134,12 +164,11 @@ impl MinimaxAlphaBeta {
         } else {
             let mut value = isize::MAX;
 
-            for movement in board.legal_movements() {
+            for movement in legal_movements {
                 let child = board.apply_movement(movement, None).unwrap();
 
                 value = value.min(self.minimax(
                     &child,
-                    game,
                     depth - 1,
                     alpha,
                     beta,
@@ -173,8 +202,8 @@ impl Agent for MinimaxAlphaBeta {
         self.metrics = SearchMetrics::default();
     }
 
-    fn choose_movement(&mut self, game: &MatchContext) -> Movement {
-        self.search(game)
+    fn choose_movement(&mut self, match_context: &MatchContext) -> Movement {
+        self.search(match_context)
     }
 }
 
