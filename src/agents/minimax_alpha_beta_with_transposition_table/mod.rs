@@ -75,19 +75,6 @@ impl MinimaxAlphaBetaWithTranspositionTable {
 
         self.metrics.elapsed_time_ns = start.elapsed().as_nanos();
 
-        //
-        // Métricas derivadas (MESMO PADRÃO do AB)
-        //
-        if self.metrics.max_depth_reached > 0 {
-            self.metrics.effective_branching_factor = (self.metrics.nodes_expanded as f64)
-                .powf(1.0 / self.metrics.max_depth_reached as f64);
-        }
-
-        if self.metrics.nodes_expanded > 0 {
-            self.metrics.nanoseconds_per_node =
-                self.metrics.elapsed_time_ns as f64 / self.metrics.nodes_expanded as f64;
-        }
-
         self.metrics.peak_tt_entries = self.table.len();
 
         self.metrics.peak_structure_memory_bytes =
@@ -398,7 +385,7 @@ fn tt_should_generate_hits() {
 fn tt_and_alpha_beta_should_choose_same_move() {
     let match_context = MatchContext::new();
 
-    let mut ab = MinimaxAlphaBeta::new(7);
+    let mut ab = MinimaxAlphaBeta::new(7, 0, false);
 
     let mut tt = MinimaxAlphaBetaWithTranspositionTable::new(7);
 
@@ -413,7 +400,7 @@ fn tt_and_alpha_beta_should_choose_same_move() {
 fn tt_should_expand_fewer_nodes() {
     let match_context = MatchContext::new();
 
-    let mut ab = MinimaxAlphaBeta::new(8);
+    let mut ab = MinimaxAlphaBeta::new(8, 0, false);
 
     let mut tt = MinimaxAlphaBetaWithTranspositionTable::new(8);
 

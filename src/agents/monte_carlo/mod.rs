@@ -1,5 +1,3 @@
-use std::time::Instant;
-
 use crate::{
     agents::{
         Agent, minimax_alpha_beta::MinimaxAlphaBeta, monte_carlo::node::MonteCarloNode,
@@ -7,6 +5,9 @@ use crate::{
     },
     game::{match_context::MatchContext, movement::Movement},
 };
+use rand::SeedableRng;
+use rand_chacha::ChaCha8Rng;
+use std::time::Instant;
 
 mod node;
 mod rollout;
@@ -17,6 +18,7 @@ pub struct MonteCarloTreeSearch {
     simulations: usize,
     metrics: SearchMetrics,
     arena: Vec<MonteCarloNode>,
+    rng: ChaCha8Rng,
 }
 
 impl MonteCarloTreeSearch {
@@ -25,13 +27,12 @@ impl MonteCarloTreeSearch {
             simulations,
             metrics: SearchMetrics::default(),
             arena: Vec::new(),
+            rng: ChaCha8Rng::seed_from_u64(512),
         }
     }
 
     fn search(&mut self, match_context: &MatchContext) -> Movement {
         self.reset_metrics();
-
-        let mut total_rollout_length = 0;
 
         let start = Instant::now();
 
@@ -105,11 +106,12 @@ impl MonteCarloTreeSearch {
                 self.arena[node_index].board.clone(),
                 root_player,
                 &mut rollout_length,
+                &mut self.rng,
             );
 
             self.metrics.nodes_evaluated += 1;
             self.metrics.leaf_nodes += 1;
-            total_rollout_length += rollout_length;
+            self.metrics.total_rollout_length += rollout_length;
 
             //
             // 4. Backpropagation
@@ -137,28 +139,6 @@ impl MonteCarloTreeSearch {
         }
 
         self.metrics.elapsed_time_ns = start.elapsed().as_nanos();
-
-        //
-        // Derived metrics
-        //
-        let internal_nodes = self
-            .arena
-            .iter()
-            .filter(|node| !node.children.is_empty())
-            .count();
-
-        if internal_nodes > 0 {
-            let total_children: usize = self.arena.iter().map(|node| node.children.len()).sum();
-
-            self.metrics.effective_branching_factor = total_children as f64 / internal_nodes as f64;
-        }
-
-        if self.metrics.nodes_expanded > 0 {
-            self.metrics.nanoseconds_per_node =
-                self.metrics.elapsed_time_ns as f64 / self.metrics.nodes_expanded as f64;
-        }
-
-        self.metrics.average_rollout_length = total_rollout_length as f64 / self.simulations as f64;
 
         //
         // Most visited child
@@ -250,7 +230,7 @@ fn mcts_finds_immediate_win() {
     match_context.play(Movement::new(5)).unwrap();
     match_context.play(Movement::new(2)).unwrap();
 
-    let mut agent = MonteCarloTreeSearch::new(100_000);
+    let mut agent = MonteCarloTreeSearch::new(10_000);
 
     let movement = agent.search(&match_context);
 

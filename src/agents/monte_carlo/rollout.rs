@@ -1,8 +1,13 @@
 use crate::game::{board::Board, game_state::GameState, player::Player};
 use rand::prelude::*;
+use rand_chacha::ChaCha8Rng;
 
-pub fn rollout(mut board: Board, root_player: Player, rollout_length: &mut usize) -> f64 {
-    let mut rng = rand::rng();
+pub fn rollout(
+    mut board: Board,
+    root_player: Player,
+    rollout_length: &mut usize,
+    rng: &mut ChaCha8Rng,
+) -> f64 {
     *rollout_length = 0;
 
     loop {

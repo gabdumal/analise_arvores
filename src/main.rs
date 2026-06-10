@@ -4,15 +4,20 @@ use crate::{
         minimax_alpha_beta_with_transposition_table::MinimaxAlphaBetaWithTranspositionTable,
         monte_carlo::MonteCarloTreeSearch,
     },
+    experiment::visualization::{
+        runner::run_visualization,
+        scenario::{VisualizationRequest, VisualizationScenario, VisualizationTarget},
+    },
     game::match_context::MatchContext,
 };
 
 mod agents;
+mod experiment;
 mod game;
 
 fn run_alpha_beta(depth_limit: usize) {
     let match_context = MatchContext::new();
-    let mut agent = MinimaxAlphaBeta::new(depth_limit);
+    let mut agent = MinimaxAlphaBeta::new(depth_limit, 0, false);
     let movement = agent.choose_movement(&match_context);
     println!(
         "Depth limit: {}. Chosen column: {}.",
@@ -65,10 +70,21 @@ fn monte_carlo() {
 }
 
 fn main() {
-    alpha_beta();
-    println!();
-    alpha_beta_with_transposition_table();
-    println!();
-    monte_carlo();
-    println!();
+    // alpha_beta();
+    // println!();
+    // alpha_beta_with_transposition_table();
+    // println!();
+    // monte_carlo();
+    // println!();
+
+    let request = VisualizationRequest {
+        target: VisualizationTarget::MinimaxAlphaBeta,
+        scenario: VisualizationScenario {
+            name: "opening".to_string(),
+            match_context: MatchContext::new(),
+        },
+        limit: 4,
+    };
+
+    run_visualization(request);
 }
