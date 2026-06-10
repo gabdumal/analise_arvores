@@ -1,14 +1,19 @@
-use crate::experiment::graphviz::{GraphvizConfig, exporter::GraphvizExporter};
+use crate::{
+    experiment::graphviz::{GraphvizConfig, exporter::GraphvizExporter, to_ascii},
+    game::{board::Board, movement::Movement},
+};
 use std::{
     fs::File,
     io::{Result, Write},
     path::Path,
+    process::Command,
 };
 
 #[derive(Clone)]
 pub struct MinimaxAlphaBetaGraphNode {
     pub id: usize,
 
+    pub board: String,
     pub value: Option<isize>,
 
     pub alpha: isize,
@@ -17,13 +22,20 @@ pub struct MinimaxAlphaBetaGraphNode {
     pub depth: usize,
 
     pub pruned: bool,
+}
 
-    pub children: Vec<usize>,
+#[derive(Clone)]
+pub struct MinimaxAlphaBetaGraphEdge {
+    pub from: usize,
+    pub to: usize,
+
+    pub movement: Movement,
 }
 
 pub struct MinimaxAlphaBetaGraph {
     pub config: GraphvizConfig,
     pub nodes: Vec<MinimaxAlphaBetaGraphNode>,
+    pub edges: Vec<MinimaxAlphaBetaGraphEdge>,
 }
 
 impl MinimaxAlphaBetaGraph {
@@ -34,6 +46,7 @@ impl MinimaxAlphaBetaGraph {
                 enabled: generate_graph,
             },
             nodes: Vec::new(),
+            edges: Vec::new(),
         }
     }
 
@@ -41,7 +54,13 @@ impl MinimaxAlphaBetaGraph {
         self.nodes.clear();
     }
 
-    pub fn create_node(&mut self, depth: usize, alpha: isize, beta: isize) -> Option<usize> {
+    pub fn create_node(
+        &mut self,
+        board: &Board,
+        depth: usize,
+        alpha: isize,
+        beta: isize,
+    ) -> Option<usize> {
         if self.nodes.len() >= self.config.max_nodes {
             return None;
         }
@@ -50,19 +69,23 @@ impl MinimaxAlphaBetaGraph {
 
         self.nodes.push(MinimaxAlphaBetaGraphNode {
             id,
+            board: to_ascii(board),
+            value: None,
             depth,
             alpha,
             beta,
-            value: None,
             pruned: false,
-            children: Vec::new(),
         });
 
         Some(id)
     }
 
-    pub fn connect(&mut self, parent: usize, child: usize) {
-        self.nodes[parent].children.push(child);
+    pub fn connect(&mut self, parent: usize, child: usize, movement: Movement) {
+        self.edges.push(MinimaxAlphaBetaGraphEdge {
+            from: parent,
+            to: child,
+            movement,
+        });
     }
 }
 
@@ -74,48 +97,76 @@ impl GraphvizExporter for MinimaxAlphaBetaGraph {
             std::fs::create_dir_all(parent)?;
         }
 
-        let mut file = File::create(path_ref)?;
+        let dot_path = path_ref.with_extension("dot");
+        let svg_path = path_ref.with_extension("svg");
 
-        writeln!(file, "digraph MinimaxAlphaBeta {{")?;
+        let mut dot_file = File::create(&dot_path)?;
 
-        writeln!(file, "rankdir=TB;")?;
+        writeln!(dot_file, "digraph MinimaxAlphaBeta {{")?;
+        writeln!(dot_file, "rankdir=TB;")?;
+        writeln!(dot_file, "node [fontname=\"Courier New\"];")?;
 
         for node in &self.nodes {
-            let color = if node.pruned { "bisque" } else { "white" };
+            let color = if node.pruned { "#FFEFDF" } else { "white" };
+
+            let board = node
+                .board
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\l");
+
+            let value = node
+                .value
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "-".to_string());
+
+            let alpha = if node.alpha == isize::MIN {
+                "-∞"
+            } else {
+                &node.alpha.to_string()
+            };
+            let beta = if node.beta == isize::MAX {
+                "∞"
+            } else {
+                &node.beta.to_string()
+            };
 
             writeln!(
-                file,
+                dot_file,
                 r#"
 {} [
 shape=box
 style=filled
 fillcolor="{}"
-label="id: {}
-depth: {}
-α: {}
-β: {}
-value: {}"
+label="id: {}\ldepth: {}\lα: {}\lβ: {}\lvalue: {}\l\l{}\l"
 ];
 "#,
-                node.id,
-                color,
-                node.id,
-                node.depth,
-                node.alpha,
-                node.beta,
-                if let Some(node_value) = node.value {
-                    node_value.to_string()
-                } else {
-                    String::from("-")
-                },
+                node.id, color, node.id, node.depth, alpha, beta, value, board,
             )?;
-
-            for child in &node.children {
-                writeln!(file, "{} -> {};", node.id, child)?;
-            }
         }
 
-        writeln!(file, "}}")?;
+        for edge in &self.edges {
+            writeln!(
+                dot_file,
+                r#"{} -> {} [label="Col: {}"];"#,
+                edge.from, edge.to, edge.movement.column,
+            )?;
+        }
+
+        writeln!(dot_file, "}}")?;
+
+        drop(dot_file);
+
+        let status = Command::new("dot")
+            .arg("-Tsvg")
+            .arg(&dot_path)
+            .arg("-o")
+            .arg(&svg_path)
+            .status()?;
+
+        if !status.success() {
+            return Err(std::io::Error::other("Graphviz failed to generate SVG."));
+        }
 
         Ok(())
     }

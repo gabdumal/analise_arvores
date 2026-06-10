@@ -30,7 +30,8 @@ fn run_minimax_alpha_beta(
     match_context: crate::game::match_context::MatchContext,
     depth_limit: usize,
 ) {
-    let mut agent = MinimaxAlphaBeta::new(depth_limit, 128, true);
+    let base: usize = 7;
+    let mut agent = MinimaxAlphaBeta::new(depth_limit, base.pow(depth_limit as u32), true);
 
     let movement = agent.choose_movement(&match_context);
 
@@ -40,10 +41,7 @@ fn run_minimax_alpha_beta(
 
     agent
         .graph
-        .export(format!(
-            "results/graphs/alpha_beta_depth_{}.dot",
-            depth_limit
-        ))
+        .export(format!("results/graphs/alpha_beta_depth_{}", depth_limit))
         .unwrap();
 }
 

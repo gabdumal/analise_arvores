@@ -28,15 +28,14 @@ impl MinimaxAlphaBeta {
         self.reset_metrics();
 
         self.graph.clear();
-        let root_id = if self.graph.config.enabled {
-            self.graph.create_node(0, isize::MIN, isize::MAX)
-        } else {
-            None
-        };
 
         let start = Instant::now();
 
+        let alpha = isize::MIN;
+        let beta = isize::MAX;
+
         let board = match_context.board();
+        let root = self.graph.create_node(board, 0, alpha, beta);
 
         let maximizing = board.current_player() == Player::Red;
 
@@ -44,7 +43,7 @@ impl MinimaxAlphaBeta {
 
         let mut best_movement = legal_movements[0];
 
-        let mut best_score = if maximizing { isize::MIN } else { isize::MAX };
+        let mut best_score = if maximizing { alpha } else { beta };
 
         for movement in legal_movements {
             let child = board.apply_movement(movement, None).unwrap();
@@ -52,11 +51,12 @@ impl MinimaxAlphaBeta {
             let score = self.minimax(
                 &child,
                 self.depth_limit - 1,
-                isize::MIN,
-                isize::MAX,
+                alpha,
+                beta,
                 !maximizing,
                 1,
-                root_id,
+                root,
+                Some(movement),
             );
 
             if maximizing {
@@ -83,18 +83,17 @@ impl MinimaxAlphaBeta {
         mut beta: isize,
         maximizing: bool,
         current_depth: usize,
-        parent: Option<usize>,
+        parent_id: Option<usize>,
+        incoming_movement: Option<Movement>,
     ) -> isize {
-        //
-        // Nó do grafo de visualização
-        //
         let node_id = if self.graph.config.enabled {
-            let node_id = self.graph.create_node(current_depth, alpha, beta);
+            let node_id = self.graph.create_node(board, current_depth, alpha, beta);
 
-            if let Some(parent_id) = parent
-                && let Some(node_id) = node_id
+            if let Some(child_id) = (node_id)
+                && let Some(parent_id) = parent_id
+                && let Some(movement) = incoming_movement
             {
-                self.graph.connect(parent_id, node_id);
+                self.graph.connect(parent_id, child_id, movement);
             }
 
             node_id
@@ -138,7 +137,12 @@ impl MinimaxAlphaBeta {
             //
             self.metrics.nodes_evaluated += 1;
 
-            return board.evaluate();
+            let value = board.evaluate();
+            if let Some(node_id) = node_id {
+                self.graph.nodes[node_id].value = Some(value);
+            }
+
+            return value;
         }
 
         //
@@ -171,6 +175,7 @@ impl MinimaxAlphaBeta {
                     false,
                     current_depth + 1,
                     node_id,
+                    Some(movement),
                 ));
 
                 alpha = alpha.max(value);
@@ -182,6 +187,10 @@ impl MinimaxAlphaBeta {
                     }
                     break;
                 }
+            }
+
+            if let Some(node_id) = node_id {
+                self.graph.nodes[node_id].value = Some(value);
             }
 
             value
@@ -199,6 +208,7 @@ impl MinimaxAlphaBeta {
                     true,
                     current_depth + 1,
                     node_id,
+                    Some(movement),
                 ));
 
                 beta = beta.min(value);
