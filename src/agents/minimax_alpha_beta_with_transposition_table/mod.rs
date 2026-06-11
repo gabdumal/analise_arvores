@@ -172,6 +172,7 @@ impl MinimaxAlphaBetaWithTranspositionTable {
                 let node = &mut self.graph.nodes[node_id];
 
                 node.tt_hit = true;
+                node.tt_source_node = entry.source_node_id;
                 node.tt_depth = Some(entry.depth);
                 node.tt_value = Some(entry.value);
                 node.tt_bound = Some(entry.node_type);
@@ -241,6 +242,7 @@ impl MinimaxAlphaBetaWithTranspositionTable {
                     value,
                     depth: remaining_depth,
                     node_type: NodeType::Exact,
+                    source_node_id: node_id,
                 },
             );
 
@@ -275,6 +277,7 @@ impl MinimaxAlphaBetaWithTranspositionTable {
                         value,
                         depth: remaining_depth,
                         node_type: NodeType::Exact,
+                        source_node_id: node_id,
                     },
                 );
 
@@ -380,6 +383,7 @@ impl MinimaxAlphaBetaWithTranspositionTable {
                 value,
                 depth: remaining_depth,
                 node_type,
+                source_node_id: node_id,
             },
         );
 

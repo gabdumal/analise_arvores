@@ -12,6 +12,7 @@ pub struct TranspositionTableEntry {
     pub value: isize,
     pub depth: usize,
     pub node_type: NodeType,
+    pub source_node_id: Option<usize>,
 }
 
 pub struct TranspositionTable {

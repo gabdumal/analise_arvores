@@ -196,6 +196,7 @@ edge [
                 value,
                 board
             );
+
             writeln!(
                 dot_file,
                 r#"
