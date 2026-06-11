@@ -2,6 +2,7 @@ use crate::{
     agents::{
         Agent, minimax_alpha_beta::MinimaxAlphaBeta,
         minimax_alpha_beta_with_transposition_table::MinimaxAlphaBetaWithTranspositionTable,
+        monte_carlo::MonteCarlo,
     },
     experiment::{
         graphviz::exporter::GraphvizExporter,
@@ -23,7 +24,7 @@ pub fn run_visualization(request: VisualizationRequest) {
         }
 
         VisualizationTarget::MonteCarlo => {
-            // run_monte_carlo(request.scenario.match_context, request.limit);
+            run_monte_carlo(request.scenario.match_context, request.limit);
         }
     }
 }
@@ -67,20 +68,20 @@ fn run_minimax_alpha_beta_with_transposition_table(
         .unwrap();
 }
 
-// fn run_monte_carlo(match_context: crate::game::match_context::MatchContext, simulations: usize) {
-//     let mut agent = MonteCarloTreeSearch::new(simulations);
+fn run_monte_carlo(match_context: crate::game::match_context::MatchContext, simulations: usize) {
+    let mut agent = MonteCarlo::new(simulations, usize::MAX, true);
 
-//     agent.enable_graph_capture();
+    let movement = agent.choose_movement(&match_context);
 
-//     let movement = agent.search(&match_context);
+    println!("Scenario: Monte-Carlo");
+    println!("Movement: {:?}", movement);
+    println!("{:#?}", agent.metrics());
 
-//     println!("Scenario: MCTS");
-//     println!("Move: {:?}", movement);
-//     println!("{:#?}", agent.metrics());
-
-//     let dot = agent.graph().to_dot();
-
-//     std::fs::create_dir_all("results/graphs").unwrap();
-
-//     std::fs::write(format!("results/graphs/mcts_{}.dot", simulations), dot).unwrap();
-// }
+    agent
+        .graph
+        .export(format!(
+            "results/graphs/monte_carlo_simulations_{}",
+            simulations
+        ))
+        .unwrap();
+}

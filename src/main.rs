@@ -2,7 +2,7 @@ use crate::{
     agents::{
         Agent, minimax_alpha_beta::MinimaxAlphaBeta,
         minimax_alpha_beta_with_transposition_table::MinimaxAlphaBetaWithTranspositionTable,
-        monte_carlo::MonteCarloTreeSearch,
+        monte_carlo::MonteCarlo,
     },
     experiment::visualization::{
         runner::run_visualization,
@@ -53,7 +53,7 @@ fn experiment_with_minimax_alpha_beta_with_transposition_table() {
 
 fn run_monte_carlo(simulations: usize) {
     let match_context = MatchContext::new();
-    let mut agent = MonteCarloTreeSearch::new(simulations);
+    let mut agent = MonteCarlo::new(simulations, 0, false);
     let movement = agent.choose_movement(&match_context);
     println!(
         "Simulations: {}. Chosen column: {}",
@@ -93,10 +93,23 @@ fn visualize_minimax_alpha_beta_with_transposition_table() {
     run_visualization(request);
 }
 
+fn visualize_monte_carlo() {
+    let request = VisualizationRequest {
+        target: VisualizationTarget::MonteCarlo,
+        scenario: VisualizationScenario {
+            name: "Opening".to_string(),
+            match_context: MatchContext::new(),
+        },
+        limit: 5_000,
+    };
+    run_visualization(request);
+}
+
 fn main() {
-    experiment_with_minimax_alpha_beta();
-    experiment_with_minimax_alpha_beta_with_transposition_table();
-    experiment_with_monte_carlo();
-    visualize_minimax_alpha_beta();
-    visualize_minimax_alpha_beta_with_transposition_table();
+    // experiment_with_minimax_alpha_beta();
+    // experiment_with_minimax_alpha_beta_with_transposition_table();
+    // experiment_with_monte_carlo();
+    // visualize_minimax_alpha_beta();
+    // visualize_minimax_alpha_beta_with_transposition_table();
+    visualize_monte_carlo();
 }

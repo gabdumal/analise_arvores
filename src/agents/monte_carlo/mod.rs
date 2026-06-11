@@ -1,8 +1,6 @@
 use crate::{
-    agents::{
-        Agent, minimax_alpha_beta::MinimaxAlphaBeta, monte_carlo::node::MonteCarloNode,
-        search_metrics::SearchMetrics,
-    },
+    agents::{Agent, monte_carlo::node::MonteCarloNode, search_metrics::SearchMetrics},
+    experiment::graphviz::monte_carlo::MonteCarloGraph,
     game::{match_context::MatchContext, movement::Movement},
 };
 use rand::SeedableRng;
@@ -14,20 +12,22 @@ mod rollout;
 mod selection;
 mod uct;
 
-pub struct MonteCarloTreeSearch {
+pub struct MonteCarlo {
     simulations: usize,
     metrics: SearchMetrics,
     arena: Vec<MonteCarloNode>,
     rng: ChaCha8Rng,
+    pub graph: MonteCarloGraph,
 }
 
-impl MonteCarloTreeSearch {
-    pub fn new(simulations: usize) -> Self {
+impl MonteCarlo {
+    pub fn new(simulations: usize, max_nodes: usize, generate_graph: bool) -> Self {
         Self {
             simulations,
             metrics: SearchMetrics::default(),
             arena: Vec::new(),
             rng: ChaCha8Rng::seed_from_u64(512),
+            graph: MonteCarloGraph::new(max_nodes, generate_graph),
         }
     }
 
@@ -37,9 +37,13 @@ impl MonteCarloTreeSearch {
         let start = Instant::now();
 
         self.arena.clear();
+        self.graph.clear();
 
-        self.arena
-            .push(MonteCarloNode::new_root(match_context.board().clone()));
+        let root_graph_id = self.graph.create_node(match_context.board(), 0);
+        self.arena.push(MonteCarloNode::new_root(
+            match_context.board().clone(),
+            root_graph_id,
+        ));
 
         let root_player = match_context.board().current_player();
 
@@ -61,11 +65,6 @@ impl MonteCarloTreeSearch {
 
             self.metrics.max_depth_reached = self.metrics.max_depth_reached.max(depth);
 
-            self.metrics.estimated_stack_memory_bytes = self
-                .metrics
-                .estimated_stack_memory_bytes
-                .max(depth * std::mem::size_of::<usize>());
-
             //
             // 2. Expansion
             //
@@ -77,31 +76,36 @@ impl MonteCarloTreeSearch {
                     .apply_movement(movement, None)
                     .unwrap();
 
+                let child_graph_id = self.graph.create_node(&child_board, depth + 1);
+
                 let child_index = self.arena.len();
 
-                self.arena
-                    .push(MonteCarloNode::new_child(child_board, node_index, movement));
+                self.arena.push(MonteCarloNode::new_child(
+                    child_board,
+                    node_index,
+                    movement,
+                    child_graph_id,
+                ));
 
                 self.arena[node_index].children.push(child_index);
 
+                if let Some(parent_graph_id) = self.arena[node_index].graph_id {
+                    if let Some(child_graph_id) = child_graph_id {
+                        self.graph
+                            .connect(parent_graph_id, child_graph_id, movement);
+                    }
+                }
+
                 node_index = child_index;
 
-                //
-                // Um nó novo foi criado
-                //
                 self.metrics.nodes_expanded += 1;
             }
-
-            //
-            // Frontier
-            //
-            let branching = self.arena[node_index].board.legal_movements().len();
-            self.metrics.peak_frontier_size = self.metrics.peak_frontier_size.max(branching);
 
             //
             // 3. Simulation
             //
             let mut rollout_length = 0;
+
             let reward = rollout::rollout(
                 self.arena[node_index].board.clone(),
                 root_player,
@@ -114,14 +118,29 @@ impl MonteCarloTreeSearch {
             self.metrics.total_rollout_length += rollout_length;
 
             //
+            // Store rollout result
+            //
+            if let Some(graph_id) = self.arena[node_index].graph_id {
+                if let Some(node) = self.graph.nodes.get_mut(graph_id) {
+                    node.rollout_result = Some(reward);
+                }
+            }
+
+            //
             // 4. Backpropagation
             //
             let mut current = Some(node_index);
 
             while let Some(index) = current {
                 self.arena[index].visits += 1;
-
                 self.arena[index].wins += reward;
+
+                if let Some(graph_id) = self.arena[index].graph_id
+                    && let Some(node) = self.graph.nodes.get_mut(graph_id)
+                {
+                    node.visits = self.arena[index].visits;
+                    node.total_reward = self.arena[index].wins;
+                }
 
                 current = self.arena[index].parent;
             }
@@ -150,13 +169,13 @@ impl MonteCarloTreeSearch {
             .iter()
             .max_by_key(|&&child| self.arena[child].visits)
             .copied()
-            .expect("Root has no children");
+            .expect("Root has no children.");
 
         self.arena[best_child].movement.unwrap()
     }
 }
 
-impl Agent for MonteCarloTreeSearch {
+impl Agent for MonteCarlo {
     fn name(&self) -> &'static str {
         "Monte Carlo Tree Search"
     }
@@ -178,7 +197,7 @@ impl Agent for MonteCarloTreeSearch {
 fn mcts_returns_legal_movement() {
     let match_context = MatchContext::new();
 
-    let mut agent = MonteCarloTreeSearch::new(1_000);
+    let mut agent = MonteCarlo::new(1_000, 0, false);
 
     let movement = agent.search(&match_context);
 
@@ -189,7 +208,7 @@ fn mcts_returns_legal_movement() {
 fn mcts_expands_tree() {
     let match_context = MatchContext::new();
 
-    let mut agent = MonteCarloTreeSearch::new(5_000);
+    let mut agent = MonteCarlo::new(5_000, 0, false);
 
     agent.search(&match_context);
 
@@ -201,7 +220,7 @@ fn mcts_expands_tree() {
 fn mcts_counts_simulations() {
     let match_context = MatchContext::new();
 
-    let mut agent = MonteCarloTreeSearch::new(10_000);
+    let mut agent = MonteCarlo::new(10_000, 0, false);
 
     agent.search(&match_context);
 
@@ -212,7 +231,7 @@ fn mcts_counts_simulations() {
 fn mcts_updates_memory_metrics() {
     let match_context = MatchContext::new();
 
-    let mut agent = MonteCarloTreeSearch::new(2_000);
+    let mut agent = MonteCarlo::new(2_000, 0, false);
 
     agent.search(&match_context);
 
@@ -230,7 +249,7 @@ fn mcts_finds_immediate_win() {
     match_context.play(Movement::new(5)).unwrap();
     match_context.play(Movement::new(2)).unwrap();
 
-    let mut agent = MonteCarloTreeSearch::new(10_000);
+    let mut agent = MonteCarlo::new(10_000, 0, false);
 
     let movement = agent.search(&match_context);
 
@@ -241,7 +260,7 @@ fn mcts_finds_immediate_win() {
 fn mcts_updates_depth_metrics() {
     let match_context = MatchContext::new();
 
-    let mut agent = MonteCarloTreeSearch::new(10_000);
+    let mut agent = MonteCarlo::new(10_000, 0, false);
 
     agent.search(&match_context);
 

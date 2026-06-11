@@ -1,4 +1,4 @@
-use super::{node::MonteCarloNode, uct::uct_score};
+use crate::agents::monte_carlo::{node::MonteCarloNode, uct::uct_score};
 
 pub fn best_child(arena: &[MonteCarloNode], node_index: usize) -> usize {
     let node = &arena[node_index];
