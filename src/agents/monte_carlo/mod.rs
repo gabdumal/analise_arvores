@@ -59,7 +59,17 @@ impl MonteCarlo {
             while self.arena[node_index].untried_movements.is_empty()
                 && !self.arena[node_index].children.is_empty()
             {
-                node_index = selection::best_child(&self.arena, node_index);
+                let (best_child, scores) = selection::best_child(&self.arena, node_index);
+
+                for (child_index, uct) in scores {
+                    if let Some(graph_id) = self.arena[child_index].graph_id {
+                        if let Some(node) = self.graph.nodes.get_mut(graph_id) {
+                            node.uct_value = Some(uct);
+                        }
+                    }
+                }
+
+                node_index = best_child;
                 depth += 1;
             }
 

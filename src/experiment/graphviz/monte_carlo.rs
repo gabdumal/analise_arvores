@@ -166,12 +166,12 @@ edge [
 
             let uct_value = node
                 .uct_value
-                .map(|v| format!("{:.4}", v))
+                .map(|v| format!("{:.2}", v))
                 .unwrap_or_else(|| "-".to_string());
 
             let rollout_result = node
                 .rollout_result
-                .map(|v| format!("{:.4}", v))
+                .map(|v| format!("{:.2}", v))
                 .unwrap_or_else(|| "-".to_string());
 
             let label_html = format!(
@@ -207,20 +207,12 @@ edge [
 
                 <TR>
                     <TD ALIGN="LEFT">Reward</TD>
-                    <TD ALIGN="RIGHT">{:.4}</TD>
+                    <TD ALIGN="RIGHT">{:.2}</TD>
                 </TR>
 
                 <TR>
                     <TD ALIGN="LEFT">UCT</TD>
                     <TD ALIGN="RIGHT">{}</TD>
-                </TR>
-
-                <TR>
-                    <TD BORDER="0" COLSPAN="2">&nbsp;</TD>
-                </TR>
-
-                <TR>
-                    <TD BORDER="0" COLSPAN="2">&nbsp;</TD>
                 </TR>
 
                 <TR>

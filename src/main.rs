@@ -100,16 +100,16 @@ fn visualize_monte_carlo() {
             name: "Opening".to_string(),
             match_context: MatchContext::new(),
         },
-        limit: 5_000,
+        limit: 10_000,
     };
     run_visualization(request);
 }
 
 fn main() {
-    // experiment_with_minimax_alpha_beta();
-    // experiment_with_minimax_alpha_beta_with_transposition_table();
-    // experiment_with_monte_carlo();
-    // visualize_minimax_alpha_beta();
-    // visualize_minimax_alpha_beta_with_transposition_table();
+    experiment_with_minimax_alpha_beta();
+    experiment_with_minimax_alpha_beta_with_transposition_table();
+    experiment_with_monte_carlo();
+    visualize_minimax_alpha_beta();
+    visualize_minimax_alpha_beta_with_transposition_table();
     visualize_monte_carlo();
 }

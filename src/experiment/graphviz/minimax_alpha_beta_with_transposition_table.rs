@@ -168,8 +168,12 @@ edge [
         )?;
 
         for node in &self.nodes {
-            let cutoff_border = if node.cutoff_occurred { 8 } else { 0 };
-            let outer_color = if node.resolved_by_tt {
+            let border = if node.cutoff_occurred || node.resolved_by_tt {
+                8
+            } else {
+                0
+            };
+            let border_color = if node.resolved_by_tt {
                 "#5cd2f6"
             } else {
                 "#5D88F5"
@@ -243,8 +247,8 @@ edge [
     </TD></TR>
 </TABLE>
 >"##,
-                cutoff_border,
-                outer_color,
+                border,
+                border_color,
                 player_border_color,
                 node.id,
                 node.depth,
