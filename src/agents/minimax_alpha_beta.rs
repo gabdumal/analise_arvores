@@ -87,7 +87,9 @@ impl MinimaxAlphaBeta {
         incoming_movement: Option<Movement>,
     ) -> isize {
         let node_id = if self.graph.config.enabled {
-            let node_id = self.graph.create_node(board, current_depth, alpha, beta);
+            let node_id = self
+                .graph
+                .create_node(board, current_depth, isize::MIN, isize::MAX);
 
             if let Some(child_id) = (node_id)
                 && let Some(parent_id) = parent_id
@@ -190,6 +192,8 @@ impl MinimaxAlphaBeta {
             }
 
             if let Some(node_id) = node_id {
+                self.graph.nodes[node_id].alpha = alpha;
+                self.graph.nodes[node_id].beta = beta;
                 self.graph.nodes[node_id].value = Some(value);
             }
 
@@ -223,6 +227,8 @@ impl MinimaxAlphaBeta {
             }
 
             if let Some(node_id) = node_id {
+                self.graph.nodes[node_id].alpha = alpha;
+                self.graph.nodes[node_id].beta = beta;
                 self.graph.nodes[node_id].value = Some(value);
             }
 

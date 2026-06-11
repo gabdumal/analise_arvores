@@ -1,6 +1,6 @@
 use crate::{
     experiment::graphviz::{GraphvizConfig, exporter::GraphvizExporter, to_ascii},
-    game::{board::Board, movement::Movement},
+    game::{board::Board, movement::Movement, player::Player},
 };
 use std::{
     fs::File,
@@ -13,6 +13,7 @@ use std::{
 pub struct MinimaxAlphaBetaGraphNode {
     pub id: usize,
 
+    pub player: Player,
     pub board: String,
     pub value: Option<isize>,
 
@@ -69,6 +70,7 @@ impl MinimaxAlphaBetaGraph {
 
         self.nodes.push(MinimaxAlphaBetaGraphNode {
             id,
+            player: board.current_player(),
             board: to_ascii(board),
             value: None,
             depth,
@@ -92,28 +94,61 @@ impl MinimaxAlphaBetaGraph {
 impl GraphvizExporter for MinimaxAlphaBetaGraph {
     fn export<P: AsRef<Path>>(&self, path: P) -> Result<()> {
         let path_ref = path.as_ref();
-
         if let Some(parent) = path_ref.parent() {
             std::fs::create_dir_all(parent)?;
         }
-
         let dot_path = path_ref.with_extension("dot");
         let svg_path = path_ref.with_extension("svg");
-
         let mut dot_file = File::create(&dot_path)?;
 
         writeln!(dot_file, "digraph MinimaxAlphaBeta {{")?;
-        writeln!(dot_file, "rankdir=TB;")?;
-        writeln!(dot_file, "node [fontname=\"Courier New\"];")?;
+
+        writeln!(
+            dot_file,
+            r#"
+fontname="Atkinson Hyperlegible Mono";
+rankdir=TB;
+splines=polyline;
+concentrate=true;
+nodesep=1;
+ranksep=4;
+            "#
+        )?;
+
+        writeln!(
+            dot_file,
+            r#"
+node [
+    fontname="Atkinson Hyperlegible Mono"
+    fontsize="32"
+    shape=none
+    border=0
+];
+"#
+        )?;
+
+        writeln!(
+            dot_file,
+            r#"
+edge [
+    fontname="Atkinson Hyperlegible Mono"
+    fontsize="64"
+    penwidth=2
+    labeldistance=1
+    labelangle=0
+];
+"#
+        )?;
 
         for node in &self.nodes {
-            let color = if node.pruned { "#FFEFDF" } else { "white" };
+            let pruned_border = if node.pruned { 8 } else { 0 };
+            let player_border_color = if node.player == Player::Red {
+                "#F5685D"
+            } else {
+                "#FFD65B"
+            };
 
-            let board = node
-                .board
-                .replace('\\', "\\\\")
-                .replace('"', "\\\"")
-                .replace('\n', "\\l");
+            let board = node.board.replace('\n', "<BR/>");
 
             let value = node
                 .value
@@ -131,24 +166,46 @@ impl GraphvizExporter for MinimaxAlphaBetaGraph {
                 &node.beta.to_string()
             };
 
+            let label_html = format!(
+                r##"<
+<TABLE STYLE="ROUNDED" BORDER="{}" COLOR="#5D88F5" CELLSPACING="8">
+    <TR><TD STYLE="ROUNDED" COLOR="{}" BORDER="4" CELLPADDING="8">
+        <TABLE STYLE="ROUNDED" COLOR="BLACK" BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8">
+            <TR><TD ALIGN="LEFT"><B>ID</B></TD><TD ALIGN="RIGHT"><B>{}</B></TD></TR>
+            <TR><TD ALIGN="LEFT">Depth</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">α</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">β</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">Value</TD><TD ALIGN="RIGHT"><B>{}</B></TD></TR>
+            <TR><TD BORDER="0" COLSPAN="2">&nbsp;</TD></TR>
+            <TR><TD BORDER="0" COLSPAN="2">{}</TD></TR>
+        </TABLE>
+    </TD></TR>
+</TABLE>
+>"##,
+                pruned_border, player_border_color, node.id, node.depth, alpha, beta, value, board
+            );
             writeln!(
                 dot_file,
                 r#"
 {} [
-shape=box
-style=filled
-fillcolor="{}"
-label="id: {}\ldepth: {}\lα: {}\lβ: {}\lvalue: {}\l\l{}\l"
+label={}
 ];
-"#,
-                node.id, color, node.id, node.depth, alpha, beta, value, board,
+                "#,
+                node.id, label_html,
             )?;
         }
 
         for edge in &self.edges {
             writeln!(
                 dot_file,
-                r#"{} -> {} [label="Col: {}"];"#,
+                r##"
+{}:s -> {}:n [headlabel=<
+<TABLE BORDER="0">
+    <TR><TD STYLE="ROUNDED" BORDER="1" CELLPADDING="8" BGCOLOR="#edf2fc">{}</TD></TR>
+    <TR><TD BORDER="0">&nbsp;</TD></TR>
+</TABLE>
+>];
+                "##,
                 edge.from, edge.to, edge.movement.column,
             )?;
         }

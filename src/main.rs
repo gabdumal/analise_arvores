@@ -83,7 +83,7 @@ fn main() {
             name: "opening".to_string(),
             match_context: MatchContext::new(),
         },
-        limit: 4,
+        limit: 5,
     };
 
     run_visualization(request);
