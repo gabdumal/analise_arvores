@@ -19,12 +19,10 @@ pub struct MinimaxAlphaBetaGraphNode {
 
     pub alpha_in: isize,
     pub beta_in: isize,
-
     pub alpha_out: isize,
     pub beta_out: isize,
 
     pub depth: usize,
-
     pub cutoff_occurred: bool,
 }
 
@@ -32,7 +30,6 @@ pub struct MinimaxAlphaBetaGraphNode {
 pub struct MinimaxAlphaBetaGraphEdge {
     pub from: usize,
     pub to: usize,
-
     pub movement: Movement,
 }
 

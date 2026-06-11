@@ -26,7 +26,6 @@ impl MinimaxAlphaBeta {
 
     fn search(&mut self, match_context: &MatchContext) -> Movement {
         self.reset_metrics();
-
         self.graph.clear();
 
         let start = Instant::now();
@@ -120,43 +119,36 @@ impl MinimaxAlphaBeta {
             None
         };
 
+        //
+        // VISITED NODE
+        //
         self.metrics.nodes_expanded += 1;
-
         self.metrics.max_depth_reached = self.metrics.max_depth_reached.max(current_depth);
 
         //
-        // Alpha-Beta puro:
-        // memória ≈ profundidade da pilha
+        // FRONTIER
         //
-        self.metrics.peak_nodes_in_memory = self.metrics.peak_nodes_in_memory.max(current_depth);
-
         let legal_movements = board.legal_movements();
-
         self.metrics.peak_frontier_size =
             self.metrics.peak_frontier_size.max(legal_movements.len());
 
+        //
+        // STACK (aproximação)
+        //
         self.metrics.estimated_stack_memory_bytes = self
             .metrics
             .estimated_stack_memory_bytes
             .max(current_depth * std::mem::size_of::<Board>());
 
         //
-        // Não existe estrutura auxiliar
-        //
-        self.metrics.peak_structure_memory_bytes = 0;
-
-        //
-        // Depth cutoff
+        // DEPTH CUTOFF
         //
         if remaining_depth == 0 {
             self.metrics.leaf_nodes += 1;
 
-            //
-            // Heurística realmente executada
-            //
+            let value = board.evaluate();
             self.metrics.nodes_evaluated += 1;
 
-            let value = board.evaluate();
             if let Some(node_id) = node_id {
                 self.graph.nodes[node_id].value = Some(value);
                 self.graph.nodes[node_id].alpha_out = alpha;
@@ -167,14 +159,16 @@ impl MinimaxAlphaBeta {
         }
 
         //
-        // Terminal node
+        // TERMINAL NODE
         //
         match board.game_state() {
             GameState::InProgress => {}
             _ => {
                 self.metrics.leaf_nodes += 1;
-                self.metrics.nodes_evaluated += 1;
+
                 let value = board.evaluate();
+                self.metrics.nodes_evaluated += 1;
+
                 if let Some(node_id) = node_id {
                     self.graph.nodes[node_id].value = Some(value);
                     self.graph.nodes[node_id].alpha_out = alpha;

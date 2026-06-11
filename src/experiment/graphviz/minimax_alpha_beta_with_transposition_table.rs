@@ -1,69 +1,258 @@
-use crate::experiment::graphviz::exporter::GraphvizExporter;
+use crate::{
+    agents::minimax_alpha_beta_with_transposition_table::transposition_table::NodeType,
+    experiment::graphviz::{GraphvizConfig, exporter::GraphvizExporter, to_ascii},
+    game::{board::Board, movement::Movement, player::Player},
+};
 use std::{
     fs::File,
     io::{Result, Write},
     path::Path,
+    process::Command,
 };
 
 #[derive(Clone)]
 pub struct MinimaxAlphaBetaWithTranspositionTableGraphNode {
     pub id: usize,
 
-    pub hash: usize,
-
+    pub player: Player,
+    pub board: String,
     pub value: Option<isize>,
 
-    pub depth: usize,
+    pub alpha_in: isize,
+    pub beta_in: isize,
+    pub alpha_out: isize,
+    pub beta_out: isize,
 
-    pub children: Vec<usize>,
+    pub depth: usize,
+    pub cutoff_occurred: bool,
+
+    pub tt_hit: bool,
+    pub tt_depth: Option<usize>,
+    pub tt_value: Option<isize>,
+    pub tt_bound: Option<NodeType>,
+    pub resolved_by_tt: bool,
 }
 
-pub struct TranspositionEdge {
+#[derive(Clone)]
+pub struct MinimaxAlphaBetaWithTranspositionTableGraphEdge {
     pub from: usize,
     pub to: usize,
+    pub movement: Movement,
 }
 
 pub struct MinimaxAlphaBetaWithTranspositionTableGraph {
+    pub config: GraphvizConfig,
     pub nodes: Vec<MinimaxAlphaBetaWithTranspositionTableGraphNode>,
+    pub edges: Vec<MinimaxAlphaBetaWithTranspositionTableGraphEdge>,
+}
 
-    pub transpositions: Vec<TranspositionEdge>,
+impl MinimaxAlphaBetaWithTranspositionTableGraph {
+    pub fn new(max_nodes: usize, generate_graph: bool) -> Self {
+        Self {
+            config: GraphvizConfig {
+                max_nodes,
+                enabled: generate_graph,
+            },
+            nodes: Vec::new(),
+            edges: Vec::new(),
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.nodes.clear();
+    }
+
+    pub fn create_node(
+        &mut self,
+        board: &Board,
+        depth: usize,
+        alpha: isize,
+        beta: isize,
+    ) -> Option<usize> {
+        if self.nodes.len() >= self.config.max_nodes {
+            return None;
+        }
+
+        let id = self.nodes.len();
+
+        self.nodes
+            .push(MinimaxAlphaBetaWithTranspositionTableGraphNode {
+                id,
+                player: board.current_player(),
+                board: to_ascii(board),
+                value: None,
+                alpha_in: alpha,
+                beta_in: beta,
+                alpha_out: alpha,
+                beta_out: beta,
+                depth,
+                cutoff_occurred: false,
+                tt_hit: false,
+                tt_bound: None,
+                tt_depth: None,
+                tt_value: None,
+                resolved_by_tt: false,
+            });
+
+        Some(id)
+    }
+
+    pub fn connect(&mut self, parent: usize, child: usize, movement: Movement) {
+        self.edges
+            .push(MinimaxAlphaBetaWithTranspositionTableGraphEdge {
+                from: parent,
+                to: child,
+                movement,
+            });
+    }
+}
+
+fn format_value(value: isize) -> String {
+    if value == isize::MIN {
+        "-∞".to_string()
+    } else if value == isize::MAX {
+        "∞".to_string()
+    } else {
+        value.to_string()
+    }
 }
 
 impl GraphvizExporter for MinimaxAlphaBetaWithTranspositionTableGraph {
     fn export<P: AsRef<Path>>(&self, path: P) -> Result<()> {
-        let mut file = File::create(path)?;
+        let path_ref = path.as_ref();
+        if let Some(parent) = path_ref.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        let dot_path = path_ref.with_extension("dot");
+        let svg_path = path_ref.with_extension("svg");
+        let mut dot_file = File::create(&dot_path)?;
 
-        writeln!(file, "digraph AlphaBetaTT {{")?;
-        writeln!(file, "rankdir=TB;")?;
+        writeln!(
+            dot_file,
+            "digraph MinimaxAlphaBetaWithTranspositionTable {{"
+        )?;
+
+        writeln!(
+            dot_file,
+            r#"
+fontname="Atkinson Hyperlegible Mono";
+rankdir=TB;
+splines=polyline;
+concentrate=true;
+nodesep=1;
+ranksep=4;
+            "#
+        )?;
+
+        writeln!(
+            dot_file,
+            r#"
+node [
+    fontname="Atkinson Hyperlegible Mono"
+    fontsize="32"
+    shape=none
+    border=0
+];
+"#
+        )?;
+
+        writeln!(
+            dot_file,
+            r#"
+edge [
+    fontname="Atkinson Hyperlegible Mono"
+    fontsize="64"
+    penwidth=2
+    labeldistance=1
+    labelangle=0
+];
+"#
+        )?;
 
         for node in &self.nodes {
+            let cutoff_border = if node.cutoff_occurred { 8 } else { 0 };
+            let player_border_color = if node.player == Player::Red {
+                "#F5685D"
+            } else {
+                "#FFD65B"
+            };
+
+            let board = node.board.replace('\n', "<BR/>");
+
+            let value = node
+                .value
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "-".to_string());
+
+            let label_html = format!(
+                r##"<
+<TABLE STYLE="ROUNDED" BORDER="{}" COLOR="#5D88F5" CELLSPACING="8">
+    <TR><TD STYLE="ROUNDED" COLOR="{}" BORDER="4" CELLPADDING="8">
+        <TABLE STYLE="ROUNDED" COLOR="BLACK" BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8">
+            <TR><TD ALIGN="LEFT"><B>ID</B></TD><TD ALIGN="RIGHT"><B>{}</B></TD></TR>
+            <TR><TD ALIGN="LEFT">Depth</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">α in</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">α out</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">β in</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">β out</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">Value</TD><TD ALIGN="RIGHT"><B>{}</B></TD></TR>
+            <TR><TD BORDER="0" COLSPAN="2">&nbsp;</TD></TR>
+            <TR><TD BORDER="0" COLSPAN="2">{}</TD></TR>
+        </TABLE>
+    </TD></TR>
+</TABLE>
+>"##,
+                cutoff_border,
+                player_border_color,
+                node.id,
+                node.depth,
+                format_value(node.alpha_in),
+                format_value(node.alpha_out),
+                format_value(node.beta_in),
+                format_value(node.beta_out),
+                value,
+                board
+            );
             writeln!(
-                file,
+                dot_file,
                 r#"
 {} [
-shape=box
-label="id={}
-hash={}
-value={:?}"
+label={}
 ];
-"#,
-                node.id, node.id, node.hash, node.value
+                "#,
+                node.id, label_html,
             )?;
-
-            for child in &node.children {
-                writeln!(file, "{} -> {};", node.id, child)?;
-            }
         }
 
-        for edge in &self.transpositions {
+        for edge in &self.edges {
             writeln!(
-                file,
-                "{} -> {} [style=dashed color=blue];",
-                edge.from, edge.to
+                dot_file,
+                r##"
+{}:s -> {}:n [headlabel=<
+<TABLE BORDER="0">
+    <TR><TD STYLE="ROUNDED" BORDER="1" CELLPADDING="8" BGCOLOR="#edf2fc">{}</TD></TR>
+    <TR><TD BORDER="0">&nbsp;</TD></TR>
+</TABLE>
+>];
+                "##,
+                edge.from, edge.to, edge.movement.column,
             )?;
         }
 
-        writeln!(file, "}}")?;
+        writeln!(dot_file, "}}")?;
+
+        drop(dot_file);
+
+        let status = Command::new("dot")
+            .arg("-Tsvg")
+            .arg(&dot_path)
+            .arg("-o")
+            .arg(&svg_path)
+            .status()?;
+
+        if !status.success() {
+            return Err(std::io::Error::other("Graphviz failed to generate SVG."));
+        }
 
         Ok(())
     }

@@ -35,7 +35,7 @@ fn alpha_beta() {
 
 fn run_alpha_beta_with_transposition_table(depth_limit: usize) {
     let match_context = MatchContext::new();
-    let mut tt = MinimaxAlphaBetaWithTranspositionTable::new(depth_limit);
+    let mut tt = MinimaxAlphaBetaWithTranspositionTable::new(depth_limit, 0, false);
     let movement = tt.choose_movement(&match_context);
     println!(
         "Depth limit: {}. Chosen column: {}.",
@@ -77,8 +77,17 @@ fn main() {
     // monte_carlo();
     // println!();
 
+    // let request = VisualizationRequest {
+    //     target: VisualizationTarget::MinimaxAlphaBeta,
+    //     scenario: VisualizationScenario {
+    //         name: "opening".to_string(),
+    //         match_context: MatchContext::new(),
+    //     },
+    //     limit: 5,
+    // };
+
     let request = VisualizationRequest {
-        target: VisualizationTarget::MinimaxAlphaBeta,
+        target: VisualizationTarget::MinimaxAlphaBetaWithTranspositionTable,
         scenario: VisualizationScenario {
             name: "opening".to_string(),
             match_context: MatchContext::new(),
