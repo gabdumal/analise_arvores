@@ -28,16 +28,3 @@ pub struct SearchMetrics {
 
     pub elapsed_time_ns: u128,
 }
-
-#[derive(Debug, Default, Clone)]
-pub struct DerivedMetrics {
-    pub nanoseconds_per_node: f64,
-    pub memory_per_node_bytes: f64,
-
-    pub effective_branching_factor: f64,
-
-    pub tt_hit_rate: f64,
-    pub cutoff_rate: f64,
-
-    pub average_rollout_length: f64,
-}

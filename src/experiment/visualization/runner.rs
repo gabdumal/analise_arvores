@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use crate::{
     agents::{
         Agent, minimax_alpha_beta::MinimaxAlphaBeta,

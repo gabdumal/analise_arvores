@@ -73,7 +73,7 @@ fn visualize_minimax_alpha_beta() {
     let request = VisualizationRequest {
         target: VisualizationTarget::MinimaxAlphaBeta,
         scenario: VisualizationScenario {
-            name: "opening".to_string(),
+            name: "Opening".to_string(),
             match_context: MatchContext::new(),
         },
         limit: 5,
@@ -85,7 +85,7 @@ fn visualize_minimax_alpha_beta_with_transposition_table() {
     let request = VisualizationRequest {
         target: VisualizationTarget::MinimaxAlphaBetaWithTranspositionTable,
         scenario: VisualizationScenario {
-            name: "opening".to_string(),
+            name: "Opening".to_string(),
             match_context: MatchContext::new(),
         },
         limit: 5,
@@ -94,5 +94,9 @@ fn visualize_minimax_alpha_beta_with_transposition_table() {
 }
 
 fn main() {
+    experiment_with_minimax_alpha_beta();
+    experiment_with_minimax_alpha_beta_with_transposition_table();
+    experiment_with_monte_carlo();
+    visualize_minimax_alpha_beta();
     visualize_minimax_alpha_beta_with_transposition_table();
 }

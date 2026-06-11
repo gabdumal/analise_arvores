@@ -1,7 +1,6 @@
 use crate::{
     agents::{
         Agent,
-        minimax_alpha_beta::MinimaxAlphaBeta,
         minimax_alpha_beta_with_transposition_table::transposition_table::{
             NodeType, TranspositionTable, TranspositionTableEntry,
         },
@@ -499,7 +498,7 @@ fn tt_should_generate_hits() {
 fn tt_and_alpha_beta_should_choose_same_move() {
     let match_context = MatchContext::new();
 
-    let mut ab = MinimaxAlphaBeta::new(7, 0, false);
+    let mut ab = crate::agents::minimax_alpha_beta::MinimaxAlphaBeta::new(7, 0, false);
 
     let mut tt = MinimaxAlphaBetaWithTranspositionTable::new(7, 0, false);
 
@@ -514,7 +513,7 @@ fn tt_and_alpha_beta_should_choose_same_move() {
 fn tt_should_expand_fewer_nodes() {
     let match_context = MatchContext::new();
 
-    let mut ab = MinimaxAlphaBeta::new(8, 0, false);
+    let mut ab = crate::agents::minimax_alpha_beta::MinimaxAlphaBeta::new(8, 0, false);
 
     let mut tt = MinimaxAlphaBetaWithTranspositionTable::new(8, 0, false);
 

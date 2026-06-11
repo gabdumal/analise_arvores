@@ -20,8 +20,8 @@ pub fn to_ascii(board: &Board) -> String {
     let mut text = String::new();
 
     for row in grid {
-        for column in 0..COLUMNS {
-            let cell = match row[column] {
+        for (column, cell) in row.iter().enumerate() {
+            let cell = match cell {
                 Some(Player::Red) => "🔴",
                 Some(Player::Yellow) => "🟡",
                 None => "⚪",

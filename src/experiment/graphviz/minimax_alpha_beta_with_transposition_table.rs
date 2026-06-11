@@ -59,10 +59,6 @@ impl MinimaxAlphaBetaWithTranspositionTableGraph {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.nodes.clear();
-    }
-
     pub fn create_node(
         &mut self,
         board: &Board,
