@@ -1,8 +1,8 @@
-use std::{default, time::Instant};
+use std::time::Instant;
 
 use crate::{
     agents::{Agent, search_metrics::SearchMetrics},
-    experiment::graphviz::minimax_alpha_beta::{MinimaxAlphaBetaGraph, MinimaxAlphaBetaGraphNode},
+    experiment::graphviz::minimax_alpha_beta::MinimaxAlphaBetaGraph,
     game::{
         board::Board, game_state::GameState, match_context::MatchContext, movement::Movement,
         player::Player,
@@ -31,11 +31,12 @@ impl MinimaxAlphaBeta {
 
         let start = Instant::now();
 
-        let alpha = isize::MIN;
-        let beta = isize::MAX;
+        let mut alpha = isize::MIN;
+        let mut beta = isize::MAX;
 
         let board = match_context.board();
         let root = self.graph.create_node(board, 0, alpha, beta);
+        self.metrics.nodes_expanded = 1;
 
         let maximizing = board.current_player() == Player::Red;
 
@@ -43,7 +44,7 @@ impl MinimaxAlphaBeta {
 
         let mut best_movement = legal_movements[0];
 
-        let mut best_score = if maximizing { alpha } else { beta };
+        let mut best_score = if maximizing { isize::MIN } else { isize::MAX };
 
         for movement in legal_movements {
             let child = board.apply_movement(movement, None).unwrap();
@@ -54,7 +55,6 @@ impl MinimaxAlphaBeta {
                 alpha,
                 beta,
                 !maximizing,
-                1,
                 root,
                 Some(movement),
             );
@@ -64,10 +64,28 @@ impl MinimaxAlphaBeta {
                     best_score = score;
                     best_movement = movement;
                 }
-            } else if score < best_score {
-                best_score = score;
-                best_movement = movement;
+
+                alpha = alpha.max(best_score);
+                if alpha >= beta {
+                    break;
+                }
+            } else {
+                if score < best_score {
+                    best_score = score;
+                    best_movement = movement;
+                }
+
+                beta = beta.min(best_score);
+                if alpha >= beta {
+                    break;
+                }
             }
+        }
+
+        if let Some(root_id) = root {
+            self.graph.nodes[root_id].value = Some(best_score);
+            self.graph.nodes[root_id].alpha_out = alpha;
+            self.graph.nodes[root_id].beta_out = beta;
         }
 
         self.metrics.elapsed_time_ns = start.elapsed().as_nanos();
@@ -78,18 +96,17 @@ impl MinimaxAlphaBeta {
     fn minimax(
         &mut self,
         board: &Board,
-        depth: usize,
+        remaining_depth: usize,
         mut alpha: isize,
         mut beta: isize,
         maximizing: bool,
-        current_depth: usize,
         parent_id: Option<usize>,
         incoming_movement: Option<Movement>,
     ) -> isize {
+        let current_depth = self.depth_limit.saturating_sub(remaining_depth);
+
         let node_id = if self.graph.config.enabled {
-            let node_id = self
-                .graph
-                .create_node(board, current_depth, isize::MIN, isize::MAX);
+            let node_id = self.graph.create_node(board, current_depth, alpha, beta);
 
             if let Some(child_id) = (node_id)
                 && let Some(parent_id) = parent_id
@@ -131,7 +148,7 @@ impl MinimaxAlphaBeta {
         //
         // Depth cutoff
         //
-        if depth == 0 {
+        if remaining_depth == 0 {
             self.metrics.leaf_nodes += 1;
 
             //
@@ -142,6 +159,8 @@ impl MinimaxAlphaBeta {
             let value = board.evaluate();
             if let Some(node_id) = node_id {
                 self.graph.nodes[node_id].value = Some(value);
+                self.graph.nodes[node_id].alpha_out = alpha;
+                self.graph.nodes[node_id].beta_out = beta;
             }
 
             return value;
@@ -158,6 +177,8 @@ impl MinimaxAlphaBeta {
                 let value = board.evaluate();
                 if let Some(node_id) = node_id {
                     self.graph.nodes[node_id].value = Some(value);
+                    self.graph.nodes[node_id].alpha_out = alpha;
+                    self.graph.nodes[node_id].beta_out = beta;
                 }
                 return value;
             }
@@ -171,11 +192,10 @@ impl MinimaxAlphaBeta {
 
                 value = value.max(self.minimax(
                     &child,
-                    depth - 1,
+                    remaining_depth - 1,
                     alpha,
                     beta,
                     false,
-                    current_depth + 1,
                     node_id,
                     Some(movement),
                 ));
@@ -185,16 +205,16 @@ impl MinimaxAlphaBeta {
                 if alpha >= beta {
                     self.metrics.alpha_cutoffs += 1;
                     if let Some(node_id) = node_id {
-                        self.graph.nodes[node_id].pruned = true;
+                        self.graph.nodes[node_id].cutoff_occurred = true;
                     }
                     break;
                 }
             }
 
             if let Some(node_id) = node_id {
-                self.graph.nodes[node_id].alpha = alpha;
-                self.graph.nodes[node_id].beta = beta;
                 self.graph.nodes[node_id].value = Some(value);
+                self.graph.nodes[node_id].alpha_out = alpha;
+                self.graph.nodes[node_id].beta_out = beta;
             }
 
             value
@@ -206,11 +226,10 @@ impl MinimaxAlphaBeta {
 
                 value = value.min(self.minimax(
                     &child,
-                    depth - 1,
+                    remaining_depth - 1,
                     alpha,
                     beta,
                     true,
-                    current_depth + 1,
                     node_id,
                     Some(movement),
                 ));
@@ -220,16 +239,16 @@ impl MinimaxAlphaBeta {
                 if alpha >= beta {
                     self.metrics.beta_cutoffs += 1;
                     if let Some(node_id) = node_id {
-                        self.graph.nodes[node_id].pruned = true;
+                        self.graph.nodes[node_id].cutoff_occurred = true;
                     }
                     break;
                 }
             }
 
             if let Some(node_id) = node_id {
-                self.graph.nodes[node_id].alpha = alpha;
-                self.graph.nodes[node_id].beta = beta;
                 self.graph.nodes[node_id].value = Some(value);
+                self.graph.nodes[node_id].alpha_out = alpha;
+                self.graph.nodes[node_id].beta_out = beta;
             }
 
             value

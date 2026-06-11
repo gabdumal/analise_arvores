@@ -17,12 +17,15 @@ pub struct MinimaxAlphaBetaGraphNode {
     pub board: String,
     pub value: Option<isize>,
 
-    pub alpha: isize,
-    pub beta: isize,
+    pub alpha_in: isize,
+    pub beta_in: isize,
+
+    pub alpha_out: isize,
+    pub beta_out: isize,
 
     pub depth: usize,
 
-    pub pruned: bool,
+    pub cutoff_occurred: bool,
 }
 
 #[derive(Clone)]
@@ -73,10 +76,12 @@ impl MinimaxAlphaBetaGraph {
             player: board.current_player(),
             board: to_ascii(board),
             value: None,
+            alpha_in: alpha,
+            beta_in: beta,
+            alpha_out: alpha,
+            beta_out: beta,
             depth,
-            alpha,
-            beta,
-            pruned: false,
+            cutoff_occurred: false,
         });
 
         Some(id)
@@ -88,6 +93,16 @@ impl MinimaxAlphaBetaGraph {
             to: child,
             movement,
         });
+    }
+}
+
+fn format_value(value: isize) -> String {
+    if value == isize::MIN {
+        "-∞".to_string()
+    } else if value == isize::MAX {
+        "∞".to_string()
+    } else {
+        value.to_string()
     }
 }
 
@@ -141,7 +156,7 @@ edge [
         )?;
 
         for node in &self.nodes {
-            let pruned_border = if node.pruned { 8 } else { 0 };
+            let cutoff_border = if node.cutoff_occurred { 8 } else { 0 };
             let player_border_color = if node.player == Player::Red {
                 "#F5685D"
             } else {
@@ -155,17 +170,6 @@ edge [
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "-".to_string());
 
-            let alpha = if node.alpha == isize::MIN {
-                "-∞"
-            } else {
-                &node.alpha.to_string()
-            };
-            let beta = if node.beta == isize::MAX {
-                "∞"
-            } else {
-                &node.beta.to_string()
-            };
-
             let label_html = format!(
                 r##"<
 <TABLE STYLE="ROUNDED" BORDER="{}" COLOR="#5D88F5" CELLSPACING="8">
@@ -173,8 +177,10 @@ edge [
         <TABLE STYLE="ROUNDED" COLOR="BLACK" BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="8">
             <TR><TD ALIGN="LEFT"><B>ID</B></TD><TD ALIGN="RIGHT"><B>{}</B></TD></TR>
             <TR><TD ALIGN="LEFT">Depth</TD><TD ALIGN="RIGHT">{}</TD></TR>
-            <TR><TD ALIGN="LEFT">α</TD><TD ALIGN="RIGHT">{}</TD></TR>
-            <TR><TD ALIGN="LEFT">β</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">α in</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">α out</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">β in</TD><TD ALIGN="RIGHT">{}</TD></TR>
+            <TR><TD ALIGN="LEFT">β out</TD><TD ALIGN="RIGHT">{}</TD></TR>
             <TR><TD ALIGN="LEFT">Value</TD><TD ALIGN="RIGHT"><B>{}</B></TD></TR>
             <TR><TD BORDER="0" COLSPAN="2">&nbsp;</TD></TR>
             <TR><TD BORDER="0" COLSPAN="2">{}</TD></TR>
@@ -182,7 +188,16 @@ edge [
     </TD></TR>
 </TABLE>
 >"##,
-                pruned_border, player_border_color, node.id, node.depth, alpha, beta, value, board
+                cutoff_border,
+                player_border_color,
+                node.id,
+                node.depth,
+                format_value(node.alpha_in),
+                format_value(node.alpha_out),
+                format_value(node.beta_in),
+                format_value(node.beta_out),
+                value,
+                board
             );
             writeln!(
                 dot_file,
